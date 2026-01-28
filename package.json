@@ -8,9 +8,9 @@
   },
   "main": "dist/index.js",
   "scripts": {
-    "build": "tsc",
+    "build": "npx tsc",
     "start": "node dist/index.js",
-    "dev": "tsc && node dist/index.js"
+    "dev": "npx tsc && node dist/index.js"
   },
   "keywords": [],
   "author": "",
@@ -19,6 +19,7 @@
   "dependencies": {
     "dotenv": "^17.2.3",
     "net": "^1.0.2",
+    "typescript": "^5.9.3",
     "urllib": "^4.9.0"
   },
   "devDependencies": {
