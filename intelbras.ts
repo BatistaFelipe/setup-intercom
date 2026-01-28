@@ -22,83 +22,68 @@ const parseIntelbrasResponse = (text: string) => {
 };
 
 const getConfigSip = async (filename: string): Promise<DefaultResponse> => {
-  return new Promise(async (resolve) => {
-    try {
-      let hosts: HostObject[] = [];
+  try {
+    const fileData: string = await readFile(filename, "utf-8");
+    const obj: ScanResult = JSON.parse(fileData);
 
-      const fileData: string = await readFile(filename, "utf-8");
-      const obj: ScanResult = JSON.parse(fileData);
+    const promises = obj.hosts.map(async (host) => {
+      const url: string = `http://${host}/cgi-bin/configManager.cgi?action=getConfig&name=SIP.RegExpiration`;
+      const { data, res } = await request(url, { ...options, method: "GET" });
 
-      for (const host of obj.hosts) {
-        const url: string = `http://${host}/cgi-bin/configManager.cgi?action=getConfig&name=SIP.RegExpiration`;
-        options["method"] = "GET";
-        const { data, res } = await request(url, options);
-
-        if (res.status !== 200)
-          throw new Error(`Erro (GET): ${host} - ${res.status}`);
-
-        const dataString: string = data.toString();
-        if (!dataString)
-          throw new Error(`Erro (DATA): ${host} - ${res.status}`);
-        const sipInfo: SipInfo = parseIntelbrasResponse(dataString);
-        if (sipInfo.time) {
-          const hostObj: HostObject = { host: host, sipTimeout: sipInfo.time };
-          hosts.push(hostObj);
-        }
+      if (res.status === 200 && data) {
+        const sipInfo: SipInfo = parseIntelbrasResponse(data.toString());
+        if (sipInfo.time) return { host, sipTimeout: sipInfo.time };
       }
-      resolve({
-        message: JSON.stringify({ hosts: hosts }, null, 2),
-        success: true,
-      });
-    } catch (error) {
-      resolve({
-        message: error.message || "Erro desconhecido",
-        success: false,
-      });
-    }
-  });
+      return null;
+    });
+    const results = await Promise.all(promises);
+    const hosts = results.filter((h): h is HostObject => h !== null);
+
+    return {
+      message: JSON.stringify({ hosts }, null, 2),
+      success: true,
+    };
+  } catch (error: any) {
+    return {
+      message: error.message || "Erro desconhecido",
+      success: false,
+    };
+  }
 };
 
 const setTimeoutSip = async (filename: string): Promise<DefaultResponse> => {
-  return new Promise(async (resolve) => {
-    try {
-      let results: SetTimeoutSipResult[] = [];
+  try {
+    const fileData: string = await readFile(filename, "utf-8");
+    const obj: ScanResult = JSON.parse(fileData);
 
-      const fileData: string = await readFile(filename, "utf-8");
-      const obj: ScanResult = JSON.parse(fileData);
+    const promises = obj.hosts.map(async (host: any) => {
+      if (host.sipTimeout > 60) {
+        const address = host.host;
+        const url: string = `http://${address}/cgi-bin/configManager.cgi?action=setConfig&SIP.RegExpiration=60`;
+        const { data, res } = await request(url, { ...options, method: "GET" });
 
-      for (const host of obj.hosts) {
-        if (host["sipTimeout"] > 60) {
-          const address: string = host["host"];
-          const url: string = `http://${address}/cgi-bin/configManager.cgi?action=setConfig&SIP.RegExpiration=60`;
-          options["method"] = "GET";
-          const { data, res } = await request(url, options);
-
-          if (res.status !== 200)
-            throw new Error(`Erro (GET): ${address} - ${res.status}`);
-
-          const dataString: string = data.toString();
-          if (!dataString)
-            throw new Error(`Erro (DATA): ${address} - ${res.status}`);
-
-          const objResult: SetTimeoutSipResult = {
-            host: address,
-            status: dataString,
-          };
-          results.push(objResult);
+        if (res.status === 200 && data) {
+          return { host: address, status: data.toString() };
         }
       }
-      resolve({
-        message: JSON.stringify({ result: results }, null, 2),
-        success: true,
-      });
-    } catch (error) {
-      resolve({
-        message: error.message || "Erro desconhecido",
-        success: false,
-      });
-    }
-  });
+      return null;
+    });
+
+    const results = await Promise.all(promises);
+    const validResults = results.filter(
+      (r): r is SetTimeoutSipResult => r !== null,
+    );
+
+    return {
+      message: JSON.stringify({ result: validResults }, null, 2),
+      success: true,
+    };
+  } catch (error: any) {
+    return {
+      message: error.message || "Erro desconhecido",
+      success: false,
+    };
+  }
 };
 
 export default { getConfigSip, setTimeoutSip };
