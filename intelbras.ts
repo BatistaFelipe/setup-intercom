@@ -53,13 +53,14 @@ const getConfigSip = async (filename: string): Promise<DefaultResponse> => {
 
 const setTimeoutSip = async (filename: string): Promise<DefaultResponse> => {
   try {
+    const SIP_TIMEOUT: number = Number(process.env.SIP_TIMEOUT);
     const fileData: string = await readFile(filename, "utf-8");
     const obj: ScanResult = JSON.parse(fileData);
 
     const promises = obj.hosts.map(async (host: any) => {
-      if (host.sipTimeout > 60) {
+      if (host.sipTimeout > SIP_TIMEOUT) {
         const address = host.host;
-        const url: string = `http://${address}/cgi-bin/configManager.cgi?action=setConfig&SIP.RegExpiration=60`;
+        const url: string = `http://${address}/cgi-bin/configManager.cgi?action=setConfig&SIP.RegExpiration=${SIP_TIMEOUT}`;
         const { data, res } = await request(url, { ...options, method: "GET" });
 
         if (res.status === 200 && data) {

@@ -4,9 +4,9 @@ import scanPortList from "./scan-ports.js";
 import Intelbras from "./intelbras.js";
 import { DefaultResponse, SetTimeoutSipResult } from "./types.js";
 
-const HOST: string = "localhost";
-const START_PORT: number = 8084;
-const END_PORT: number = 8099;
+const HOST: string = process.env.INTELBRAS_HOST;
+const START_PORT: number = Number(process.env.START_PORT);
+const END_PORT: number = Number(process.env.END_PORT);
 const SCAN_PORTS_FILE: string = path.resolve("data", "scan-ports.json");
 const DATA_API_FILE: string = path.resolve("data", "intelbras.json");
 
