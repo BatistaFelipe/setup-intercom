@@ -62,18 +62,31 @@ SIP_TIMEOUT=60
 
 ## 🏃 Execução
 
-Para rodar o projeto em modo de desenvolvimento:
+O endereço de destino pode ser definido de duas formas, seguindo esta ordem de prioridade:
+
+1. **Argumento CLI** (sobrescreve tudo)
+2. **Variável de Ambiente** (`.env`)
+
+### Uso via Terminal
 
 ```bash
-npm run dev
+npm run dev -- -d 192.168.1.50
 ```
 
-Para gerar a build e rodar em produção:
+### Uso via .env
 
-```bash
-npm run build
-npm start
+Se nenhum argumento for passado, o sistema utiliza o valor definido no arquivo `.env`:
+
+```env
+INTELBRAS_HOST=192.168.1.50
 ```
+
+### Parâmetros
+
+| Flag             | Descrição                       | Padrão          |
+| ---------------- | ------------------------------- | --------------- |
+| `-d, --dst-host` | Define o host de destino.       | Valor do `.env` |
+| `--help`         | Mostra os comandos disponíveis. | N/A             |
 
 ## 📦 Tecnologias Utilizadas
 
@@ -81,5 +94,3 @@ npm start
 - **Urllib**: Para realizar as requisições HTTP Digest Auth aos dispositivos.
 - **Net (Socket)**: Para o escaneamento de portas de rede.
 - **Dotenv**: Gestão de variáveis de ambiente.
-
----
