@@ -3,8 +3,15 @@ import path from "node:path";
 import scanPortList from "./scan-ports.js";
 import Intelbras from "./intelbras.js";
 import { DefaultResponse, SetTimeoutSipResult } from "./types.js";
+import { Command } from "commander";
 
-const HOST: string = process.env.INTELBRAS_HOST;
+const program = new Command();
+
+program.option("-d, --dst-host <string>", "Destination host");
+program.parse(process.argv);
+const options = program.opts();
+
+const HOST: string = options.dstHost || process.env.INTELBRAS_HOST;
 const START_PORT: number = Number(process.env.START_PORT);
 const END_PORT: number = Number(process.env.END_PORT);
 const SCAN_PORTS_FILE: string = path.resolve("data", "scan-ports.json");
