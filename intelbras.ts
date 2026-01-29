@@ -58,7 +58,7 @@ const setTimeoutSip = async (filename: string): Promise<DefaultResponse> => {
     const obj: ScanResult = JSON.parse(fileData);
 
     const promises = obj.hosts.map(async (host: any) => {
-      if (host.sipTimeout > SIP_TIMEOUT) {
+      if (host.sipTimeout !== SIP_TIMEOUT) {
         const address = host.host;
         const url: string = `http://${address}/cgi-bin/configManager.cgi?action=setConfig&SIP.RegExpiration=${SIP_TIMEOUT}`;
         const { data, res } = await request(url, { ...options, method: "GET" });
