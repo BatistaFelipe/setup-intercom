@@ -1,76 +1,51 @@
-import fs from "fs/promises";
 import path from "node:path";
-import scanPortList from "./services/scan-ports.js";
-import Hikvision from "./services/hikvision.js";
-import Intelbras from "./services/intelbras.js";
-import { log, UnknownError } from "./utils.js";
+import runScanList from "./services/scan-ports.js";
+import hikvision from "./services/hikvision.js";
+import intelbras from "./services/intelbras.js";
+import { log, saveToFile } from "./utils.js";
 import { DefaultResponse, SetTimeoutSipResult, SipService } from "./types.js";
 import { Command } from "commander";
 
 const program = new Command();
 
 program.option("-d, --dst-host <string>", "Destination host");
+program.option("-r, --read-file", "Read hosts from file ./data/hosts.json");
 program.parse(process.argv);
 const options = program.opts();
 
-const HOST: string = options.dstHost || process.env.DST_HOST;
-const START_PORT: number = Number(process.env.START_PORT || 8084);
-const END_PORT: number = Number(process.env.END_PORT || 8099);
-const SCAN_PORTS_FILE: string = path.resolve("data", "scan-ports.json");
-const DATAFILE_HIKVISION: string = path.resolve("data", "hikvision.json");
-const DATAFILE_INTELBRAS: string = path.resolve("data", "intelbras.json");
-
-const saveToFile = async (filename: string, data: string) => {
-  try {
-    await fs.writeFile(filename, data, "utf-8");
-    return { message: "Arquivo salvo com sucesso", success: true };
-  } catch (error: unknown) {
-    const customError = new UnknownError(error);
-    return customError.toJSON();
-  }
-};
-
-async function runScanList() {
-  // faz o scan de portas e salva no arquivo json somente os liberados
-  const scanList: DefaultResponse = await scanPortList(
-    HOST,
-    START_PORT,
-    END_PORT,
-  );
-  const statusSave = await saveToFile(SCAN_PORTS_FILE, scanList.message);
-  if (!statusSave.success) {
-    log.error(
-      `❌ ${SCAN_PORTS_FILE} ${HOST}: Erro ao salvar arquivo!\n${statusSave.message}`,
-    );
-    return;
-  }
-  log.info(`✅ ${SCAN_PORTS_FILE} ${HOST}: Arquivo salvo com sucesso!`);
-}
-
-async function runGetConfig(object: SipService, filename: string) {
+async function runGetConfig(
+  object: SipService,
+  host: string,
+  datafile: string,
+  scanPortsFile: string,
+) {
   const timeoutSipList: DefaultResponse =
-    await object.getConfigSip(SCAN_PORTS_FILE);
+    await object.getConfigSip(scanPortsFile);
   if (!timeoutSipList.success) {
     log.error(
-      `❌ ${HOST}: Erro ao buscar SIP.RegExpiration! - ${timeoutSipList.message}`,
+      `❌ ${host}: Erro ao buscar SIP.RegExpiration! - ${timeoutSipList.message}`,
     );
     return;
   }
-  const statusSave = await saveToFile(filename, timeoutSipList.message);
+  const statusSave = await saveToFile(datafile, timeoutSipList.message);
   if (!statusSave.success) {
     log.error(
-      `❌ ${filename} ${HOST}: Erro ao salvar arquivo!\n${statusSave.message}`,
+      `❌ ${datafile} ${host}: Erro ao salvar arquivo!\n${statusSave.message}`,
     );
     return;
   }
-  log.info(`✅ ${filename} ${HOST}: Arquivo salvo com sucesso!`);
+  log.info(`✅ ${datafile} ${host}: Arquivo salvo com sucesso!`);
 }
 
-async function runSetConfig(object: SipService, filename: string) {
-  const setTimeoutSip: DefaultResponse = await object.setTimeoutSip(filename);
+async function runSetConfig(
+  object: SipService,
+  host: string,
+  datafile: string,
+) {
+  const setTimeoutSip: DefaultResponse = await object.setTimeoutSip(datafile);
   if (!setTimeoutSip.success) {
     log.error(
-      `❌ SET_TIMEOUT_SIP ${HOST}: Erro ao configurar dispositivo!\n${setTimeoutSip.message}`,
+      `❌ SET_TIMEOUT_SIP ${host}: Erro ao configurar dispositivo!\n${setTimeoutSip.message}`,
     );
     return;
   }
@@ -91,10 +66,19 @@ async function runSetConfig(object: SipService, filename: string) {
 }
 
 (async () => {
-  await runScanList();
-  await runGetConfig(Hikvision, DATAFILE_HIKVISION);
-  await runSetConfig(Hikvision, DATAFILE_HIKVISION);
+  const host: string = options.dstHost || process.env.DST_HOST;
+  const startPort: number = Number(process.env.START_PORT || 8084);
+  const endPort: number = Number(process.env.END_PORT || 8099);
 
-  await runGetConfig(Intelbras, DATAFILE_INTELBRAS);
-  await runSetConfig(Intelbras, DATAFILE_INTELBRAS);
+  const scanPortsFile: string = path.resolve("data", "scan-ports.json");
+  const datafileHikvision: string = path.resolve("data", "hikvision.json");
+  const datafileIntelbras: string = path.resolve("data", "intelbras.json");
+  const datafileHosts: string = path.resolve("data", "hosts.json");
+
+  await runScanList(scanPortsFile, host, startPort, endPort);
+  await runGetConfig(hikvision, host, datafileHikvision, scanPortsFile);
+  await runSetConfig(hikvision, host, datafileHikvision);
+
+  await runGetConfig(intelbras, host, datafileIntelbras, scanPortsFile);
+  await runSetConfig(intelbras, host, datafileIntelbras);
 })();

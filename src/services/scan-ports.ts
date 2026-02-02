@@ -1,6 +1,7 @@
 import net from "net";
 import { DefaultResponse } from "../types.js";
-import { promisesLimit, UnknownError } from "../utils.js";
+import { log, promisesLimit, UnknownError } from "../utils.js";
+import { saveToFile } from "../utils.js";
 
 const pLimit = promisesLimit();
 
@@ -63,4 +64,26 @@ const scanPortList = async (
   };
 };
 
-export default scanPortList;
+async function runScanList(
+  scanPortsFile: string,
+  host: string,
+  startPort: number,
+  endPort: number,
+) {
+  // faz o scan de portas e salva no arquivo json somente os liberados
+  const scanList: DefaultResponse = await scanPortList(
+    host,
+    startPort,
+    endPort,
+  );
+  const statusSave = await saveToFile(scanPortsFile, scanList.message);
+  if (!statusSave.success) {
+    log.error(
+      `❌ ${scanPortsFile} ${host}: Erro ao salvar arquivo!\n${statusSave.message}`,
+    );
+    return;
+  }
+  log.info(`✅ ${scanPortsFile} ${host}: Arquivo salvo com sucesso!`);
+}
+
+export default runScanList;

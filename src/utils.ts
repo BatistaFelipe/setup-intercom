@@ -1,3 +1,4 @@
+import fs from "fs/promises";
 import winston, { Logger } from "winston";
 import pLimit from "p-limit";
 
@@ -38,3 +39,13 @@ export class UnknownError extends Error {
     };
   }
 }
+
+export const saveToFile = async (filename: string, data: string) => {
+  try {
+    await fs.writeFile(filename, data, "utf-8");
+    return { message: "Arquivo salvo com sucesso", success: true };
+  } catch (error: unknown) {
+    const customError = new UnknownError(error);
+    return customError.toJSON();
+  }
+};
