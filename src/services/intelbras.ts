@@ -2,7 +2,7 @@ import { readFile } from "fs/promises";
 import "dotenv/config";
 import { request } from "urllib";
 import {
-  ScanResult,
+  FileData,
   HostConfig,
   DefaultResponse,
   SetTimeoutSipResult,
@@ -26,7 +26,7 @@ const parseIntelbrasResponse = (text: string) => {
 const getConfigSip = async (filename: string): Promise<DefaultResponse> => {
   try {
     const fileData: string = await readFile(filename, "utf-8");
-    const obj: ScanResult = JSON.parse(fileData);
+    const obj: FileData = JSON.parse(fileData);
 
     const promises = obj.hosts.map((host) =>
       pLimit(async () => {

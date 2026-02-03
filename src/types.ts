@@ -9,8 +9,8 @@ export interface HostConfig {
   sipTimeout?: number;
 }
 
-export interface ScanResult {
-  hosts: (string | HostConfig)[]; // Aceita tanto string quanto o objeto
+export interface FileData {
+  hosts: (string | HostConfig)[];
 }
 
 export interface SetTimeoutSipResult {
