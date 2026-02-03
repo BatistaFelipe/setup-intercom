@@ -13,12 +13,24 @@ Este projeto automatiza a configuração do tempo de expiração de registro SIP
 
 ```text
 src/
-├── services/     # Integração Hikvision, Intelbras e Scan de portas
-├── types.ts      # Interfaces e definições TypeScript
-├── utils.ts      # Logger e utilitários de erro
-└── index.ts      # Ponto de entrada (executa fluxo para ambos fabricantes)
-data/             # JSONs gerados e logs do sistema
+├── services/       # Integração Hikvision, Intelbras e Scan de portas
+├── types.ts        # Interfaces e definições TypeScript
+├── utils.ts        # Logger e utilitários de erro
+└── index.ts        # Ponto de entrada (executa fluxo para ambos fabricantes)
+data/               # JSONs gerados e logs do sistema
+├── combined.log    # (Gerado automaticamente) Log de execução
+├── hikvision.json  # (Gerado automaticamente) Dispositivos Hikvision
+├── intelbras.json  # (Gerado automaticamente) Dispositivos Intelbras
+├── scan-ports.json # (Gerado automaticamente) Resultado do scanner de portas
+└── hosts.json      # Lista de endereços para ler com atributo --read-file
+```
 
+### Modelo do arquivo hosts.json
+
+```json
+{
+  "hosts": ["host_address1", "host_address2", "host_address3"]
+}
 ```
 
 ## 🚀 Como Executar
@@ -71,9 +83,10 @@ npm run dev -- -d 192.168.1.50
 
 ### Parâmetros
 
-| Flag             | Descrição                       | Padrão          |
-| ---------------- | ------------------------------- | --------------- |
-| `-d, --dst-host` | Define o host de destino.       | Valor do `.env` |
-| `--help`         | Mostra os comandos disponíveis. | N/A             |
+| Flag              | Descrição                            | Padrão          |
+| ----------------- | ------------------------------------ | --------------- |
+| `-d, --dst-host`  | Define o host de destino.            | Valor do `.env` |
+| `-r, --read-file` | Ler os hosts do arquivo `hosts.json` | Valor do `.env` |
+| `--help`          | Mostra os comandos disponíveis.      | N/A             |
 
 ---
