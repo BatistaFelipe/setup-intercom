@@ -49,7 +49,7 @@ npm install
 
 Crie um arquivo `.env` na raiz do projeto com as credenciais de ambos os fabricantes:
 
-```env
+```bash
 # Configurações Gerais
 START_PORT=8084
 END_PORT=8099
@@ -69,6 +69,10 @@ SIP_PASSWORD='senha_ramal_sip'
 INTELBRAS_USER='admin'
 INTELBRAS_PWD='senha_intelbras'
 SIP_TIMEOUT_INTELBRAS=60
+# Auto Reboot
+AUTOREBOOTDAY=7 # 7 dias da semana
+AUTOREBOOTENABLE=true # ativar
+AUTOREBOOTHOUR=4 # horário de reinicialização
 ```
 
 ## 🏃 Execução
@@ -83,10 +87,11 @@ npm run dev -- -d 192.168.1.50
 
 ### Parâmetros
 
-| Flag              | Descrição                            | Padrão          |
-| ----------------- | ------------------------------------ | --------------- |
-| `-d, --dst-host`  | Define o host de destino.            | Valor do `.env` |
-| `-r, --read-file` | Ler os hosts do arquivo `hosts.json` | Valor do `.env` |
-| `--help`          | Mostra os comandos disponíveis.      | N/A             |
+| Flag                | Descrição                                       | Padrão          |
+| ------------------- | ----------------------------------------------- | --------------- |
+| `-d, --dst-host`    | Define o host de destino.                       | Valor do `.env` |
+| `-r, --read-file`   | Ler os hosts do arquivo `hosts.json`            | Valor do `.env` |
+| `-a, --auto-reboot` | Configurar auto reboot nos interfones Intelbras | N/A             |
+| `--help`            | Mostra os comandos disponíveis.                 | N/A             |
 
 ---

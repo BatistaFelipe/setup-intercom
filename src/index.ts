@@ -2,14 +2,20 @@ import path from "node:path";
 import runScanList from "./services/scan-ports.js";
 import hikvision from "./services/hikvision.js";
 import intelbras from "./services/intelbras.js";
-import { readHostsFile, promisesLimit, UnknownError, log } from "./utils.js";
-import { runGetConfig, runSetConfig } from "./orchestrator.js";
+import { readHostsFile, UnknownError, log } from "./utils.js";
+import {
+  runGetConfig,
+  runSetConfig,
+  runSetAutoMaintainReboot,
+} from "./orchestrator.js";
 import { Command } from "commander";
 
 const program = new Command();
 
 program.option("-d, --dst-host <string>", "set destination host");
 program.option("-r, --read-file", "read hosts from file ./data/hosts.json");
+program.option("-a, --auto-reboot", "set auto reboot in Intelbras devices");
+
 program.parse(process.argv);
 const options = program.opts();
 
@@ -39,6 +45,11 @@ const options = program.opts();
       // Intelbras
       await runGetConfig(intelbras, address, datafileIntelbras, scanPortsFile);
       await runSetConfig(intelbras, address, datafileIntelbras);
+
+      if (options.autoReboot) {
+        // Auto Reboot Intelbras
+        await runSetAutoMaintainReboot(intelbras, address, scanPortsFile);
+      }
     }
   } catch (error: unknown) {
     const customError = new UnknownError(error);

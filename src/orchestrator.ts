@@ -1,5 +1,10 @@
 import { log, saveToFile } from "./utils.js";
-import { DefaultResponse, SetTimeoutSipResult, SipService } from "./types.js";
+import {
+  DefaultResponse,
+  RequestResult,
+  SipService,
+  AutoMaintain,
+} from "./types.js";
 
 export async function runGetConfig(
   object: SipService,
@@ -39,7 +44,7 @@ export async function runSetConfig(
   }
   try {
     const data = JSON.parse(setTimeoutSip.message);
-    const results: SetTimeoutSipResult[] = data.result || [];
+    const results: RequestResult[] = data.result || [];
 
     for (const item of results) {
       log.info(
@@ -49,6 +54,35 @@ export async function runSetConfig(
   } catch (error) {
     log.error(
       `❌ SET_TIMEOUT_SIP - Erro: ${error.message || "Erro desconhecido"}`,
+    );
+  }
+}
+
+export async function runSetAutoMaintainReboot(
+  object: AutoMaintain,
+  host: string,
+  datafile: string,
+) {
+  const setAutoMaintainReboot: DefaultResponse =
+    await object.setAutoMaintainReboot(datafile);
+  if (!setAutoMaintainReboot.success) {
+    log.error(
+      `❌ SET_AUTO_MAINTAIN_REBOOT ${host}: Erro ao configurar dispositivo!\n${setAutoMaintainReboot.message}`,
+    );
+    return;
+  }
+  try {
+    const data = JSON.parse(setAutoMaintainReboot.message);
+    const results: RequestResult[] = data.result || [];
+
+    for (const item of results) {
+      log.info(
+        `✅ SET_AUTO_MAINTAIN_REBOOT - host: ${item.host} status: ${item.status_code}`,
+      );
+    }
+  } catch (error) {
+    log.error(
+      `❌ SET_AUTO_MAINTAIN_REBOOT - Erro: ${error.message || "Erro desconhecido"}`,
     );
   }
 }

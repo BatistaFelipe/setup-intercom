@@ -13,7 +13,7 @@ export interface FileData {
   hosts: (string | HostConfig)[];
 }
 
-export interface SetTimeoutSipResult {
+export interface RequestResult {
   host: string;
   data: string;
   status_code: number;
@@ -22,4 +22,8 @@ export interface SetTimeoutSipResult {
 export interface SipService {
   getConfigSip(filename: string): Promise<DefaultResponse>;
   setTimeoutSip(filename: string): Promise<DefaultResponse>;
+}
+
+export interface AutoMaintain {
+  setAutoMaintainReboot(filename: string): Promise<DefaultResponse>;
 }

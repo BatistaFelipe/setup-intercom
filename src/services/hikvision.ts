@@ -5,7 +5,7 @@ import {
   FileData,
   HostConfig,
   DefaultResponse,
-  SetTimeoutSipResult,
+  RequestResult,
 } from "../types.js";
 import { xml2json } from "xml-js";
 import xmlbuilder from "xmlbuilder";
@@ -111,7 +111,7 @@ const setTimeoutSip = async (filename: string): Promise<DefaultResponse> => {
           });
 
           if (res.status === 200 && data) {
-            const setSipTimeoutObject: SetTimeoutSipResult = {
+            const setSipTimeoutObject: RequestResult = {
               host: address,
               data: data.toString(),
               status_code: 200,
@@ -124,9 +124,7 @@ const setTimeoutSip = async (filename: string): Promise<DefaultResponse> => {
     );
 
     const results = await Promise.all(promises);
-    const validResults = results.filter(
-      (r): r is SetTimeoutSipResult => r !== null,
-    );
+    const validResults = results.filter((r): r is RequestResult => r !== null);
 
     return {
       message: JSON.stringify({ result: validResults }, null, 2),

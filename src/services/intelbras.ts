@@ -5,7 +5,7 @@ import {
   FileData,
   HostConfig,
   DefaultResponse,
-  SetTimeoutSipResult,
+  RequestResult,
 } from "../types.js";
 import { promisesLimit, UnknownError } from "../utils.js";
 
@@ -93,9 +93,7 @@ const setTimeoutSip = async (filename: string): Promise<DefaultResponse> => {
     );
 
     const results = await Promise.all(promises);
-    const validResults = results.filter(
-      (r): r is SetTimeoutSipResult => r !== null,
-    );
+    const validResults = results.filter((r): r is RequestResult => r !== null);
 
     return {
       message: JSON.stringify({ result: validResults }, null, 2),
@@ -107,4 +105,50 @@ const setTimeoutSip = async (filename: string): Promise<DefaultResponse> => {
   }
 };
 
-export default { getConfigSip, setTimeoutSip };
+const setAutoMaintainReboot = async (
+  filename: string,
+): Promise<DefaultResponse> => {
+  try {
+    const AUTOREBOOTDAY: number = Number(process.env.AUTOREBOOTDAY) || 7;
+    const AUTOREBOOTENABLE: boolean =
+      Boolean(process.env.AUTOREBOOTENABLE) || true;
+    const AUTOREBOOTHOUR: number = Number(process.env.AUTOREBOOTHOUR) || 4;
+    const fileData: string = await readFile(filename, "utf-8");
+    const hostConfig: { hosts: HostConfig[] } = JSON.parse(fileData);
+
+    const promises = hostConfig.hosts.map((host: HostConfig) =>
+      pLimit(async () => {
+        const address = typeof host === "string" ? host : host.host;
+        const queryParams: string = `AutoMaintain.AutoRebootDay=${AUTOREBOOTDAY}&AutoMaintain.AutoRebootEnable=${AUTOREBOOTENABLE}&AutoMaintain.AutoRebootHour=${AUTOREBOOTHOUR}`;
+        const url: string = `http://${address}/cgi-bin/configManager.cgi?action=setConfig&${queryParams}`;
+        const { data, res } = await request(url, {
+          ...options,
+          method: "GET",
+        });
+
+        let textResponse: string;
+
+        if (res.status === 200 && data) {
+          textResponse = data.toString().replace(/\s/g, "");
+        }
+
+        if (textResponse == "OK")
+          return { host: address, data: textResponse, status_code: 200 };
+
+        return null;
+      }),
+    );
+
+    const results = await Promise.all(promises);
+    const validResults = results.filter((r): r is RequestResult => r !== null);
+
+    return {
+      message: JSON.stringify({ result: validResults }, null, 2),
+      success: true,
+    };
+  } catch (error: unknown) {
+    const customError = new UnknownError(error);
+    return customError.toJSON();
+  }
+};
+export default { getConfigSip, setTimeoutSip, setAutoMaintainReboot };
