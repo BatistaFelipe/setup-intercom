@@ -1,12 +1,6 @@
-import { readFile } from "fs/promises";
 import "dotenv/config";
 import { request } from "urllib";
-import {
-  FileData,
-  HostConfig,
-  DefaultResponse,
-  RequestResult,
-} from "../types.js";
+import { HostConfig, DefaultResponse, RequestResult } from "../types.js";
 import { xml2json } from "xml-js";
 import xmlbuilder from "xmlbuilder";
 import {
@@ -14,6 +8,7 @@ import {
   UnknownError,
   getRequiredEnv,
   getRequiredNumberEnv,
+  getDeviceProtocol,
   log,
 } from "../utils.js";
 
@@ -25,16 +20,12 @@ const options = Object.freeze({
   digestAuth: `${getRequiredEnv("HIKVISION_USER")}:${getRequiredEnv("HIKVISION_PWD")}`,
 });
 
-const getConfigSip = async (filename: string): Promise<DefaultResponse> => {
+const getConfigSip = async (hosts: string[]): Promise<DefaultResponse> => {
   try {
-    const fileData: string = await readFile(filename, "utf-8");
-    const hostConfig: FileData = JSON.parse(fileData);
-
-    const promises = hostConfig.hosts.map((host) =>
+    const promises = hosts.map((address) =>
       pLimit(async () => {
-        const address = typeof host === "string" ? host : host.host;
         try {
-          const url: string = `http://${address}/ISAPI/System/Network/SIP`;
+          const url = `${getDeviceProtocol()}://${address}/ISAPI/System/Network/SIP`;
           const { data, res } = await request(url, {
             ...options,
             method: "GET",
@@ -71,10 +62,10 @@ const getConfigSip = async (filename: string): Promise<DefaultResponse> => {
       }),
     );
     const results = await Promise.all(promises);
-    const hosts = results.filter((h): h is HostConfig => h !== null);
+    const validHosts = results.filter((h): h is HostConfig => h !== null);
 
     return {
-      message: JSON.stringify({ hosts }, null, 2),
+      message: JSON.stringify({ hosts: validHosts }, null, 2),
       success: true,
     };
   } catch (error: unknown) {
@@ -102,18 +93,18 @@ const postXmlBody = (extension: number): string => {
   return xml.toString();
 };
 
-const setTimeoutSip = async (filename: string): Promise<DefaultResponse> => {
+const setTimeoutSip = async (
+  configs: HostConfig[],
+): Promise<DefaultResponse> => {
   try {
-    const SIP_TIMEOUT: number = getRequiredNumberEnv("SIP_TIMEOUT_HIKVISION");
-    const fileData: string = await readFile(filename, "utf-8");
-    const hostConfig: { hosts: HostConfig[] } = JSON.parse(fileData);
+    const SIP_TIMEOUT = getRequiredNumberEnv("SIP_TIMEOUT_HIKVISION");
 
-    const promises = hostConfig.hosts.map((host: HostConfig) =>
+    const promises = configs.map((host) =>
       pLimit(async () => {
         if (Number(host.sipTimeout) !== SIP_TIMEOUT) {
-          const address = typeof host === "string" ? host : host.host;
-          const url: string = `http://${address}/ISAPI/System/Network/SIP`;
-          const body: string = postXmlBody(host.extension!);
+          const address = host.host;
+          const url = `${getDeviceProtocol()}://${address}/ISAPI/System/Network/SIP`;
+          const body = postXmlBody(host.extension!);
 
           const { data, res } = await request(url, {
             ...options,

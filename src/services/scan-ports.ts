@@ -1,10 +1,10 @@
 import net from "net";
 import { DefaultResponse } from "../types.js";
-import { log, promisesLimit, saveToFile } from "../utils.js";
+import { promisesLimit } from "../utils.js";
 
 const pLimit = promisesLimit();
 
-const scanPort = (
+export const scanPort = (
   host: string,
   port: number,
   socket_timeout: number = 1000,
@@ -37,7 +37,7 @@ const scanPort = (
 };
 
 // Scans a port range on a host and returns open ports
-const scanPortList = async (
+export const scanPortList = async (
   host: string,
   startPort: number,
   endPort: number,
@@ -58,25 +58,3 @@ const scanPortList = async (
   };
 };
 
-async function runScanList(
-  scanPortsFile: string,
-  host: string,
-  startPort: number,
-  endPort: number,
-) {
-  const scanList: DefaultResponse = await scanPortList(
-    host,
-    startPort,
-    endPort,
-  );
-  const statusSave = await saveToFile(scanPortsFile, scanList.message);
-  if (!statusSave.success) {
-    log.error(
-      `SCAN_PORTS ${scanPortsFile} ${host}: Failed to save file - ${statusSave.message}`,
-    );
-    return;
-  }
-  log.info(`SCAN_PORTS ${scanPortsFile} ${host}: File saved successfully`);
-}
-
-export default runScanList;

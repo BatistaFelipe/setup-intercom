@@ -1,5 +1,5 @@
 import path from "node:path";
-import runScanList from "./services/scan-ports.js";
+import { scanPortList } from "./services/scan-ports.js";
 import hikvision from "./services/hikvision.js";
 import intelbras from "./services/intelbras.js";
 import {
@@ -8,12 +8,18 @@ import {
   log,
   validateHost,
   validatePortRange,
+  getRequiredEnv,
+  getDeviceProtocol,
+  promisesLimit,
 } from "./utils.js";
 import {
   runGetConfig,
   runSetConfig,
   runSetAutoMaintainReboot,
 } from "./orchestrator.js";
+import { queryCondominium } from "./inventory/query.js";
+import { detectVendor } from "./inventory/detect-vendor.js";
+import type { InventoryCredentials, DeviceVendor } from "./inventory/types.js";
 import { Command } from "commander";
 import { FileData } from "./types.js";
 
@@ -22,6 +28,7 @@ const program = new Command();
 program.option("-d, --dst-host <string>", "set destination host");
 program.option("-r, --read-file", "read hosts from file ./data/hosts.json");
 program.option("-a, --auto-reboot", "set auto reboot in Intelbras devices");
+program.option("-i, --info", "query device inventory for the target host(s)");
 
 program.parse(process.argv);
 const options = program.opts();
@@ -41,37 +48,106 @@ const options = program.opts();
       log.error("Invalid hosts file: missing 'hosts' array");
       process.exit(1);
     }
-    hosts = parsed.hosts.map((h) => (typeof h === "string" ? h : h.host));
+    hosts = parsed.hosts.map((h, index) => {
+      if (typeof h === "string") {
+        if (!h) throw new Error(`Invalid hosts file entry at index ${index}: empty string`);
+        return h;
+      }
+      if (h && typeof h === "object" && typeof h.host === "string" && h.host) {
+        return h.host;
+      }
+      throw new Error(`Invalid hosts file entry at index ${index}`);
+    });
   }
 
   for (const host of hosts) {
     validateHost(host);
   }
 
-  const startPort: number = Number(process.env.START_PORT || 8084);
-  const endPort: number = Number(process.env.END_PORT || 8099);
+  const startPort = Number(process.env.START_PORT || 8084);
+  const endPort = Number(process.env.END_PORT || 8099);
   validatePortRange(startPort, endPort);
 
-  const scanPortsFile: string = path.resolve("data", "scan-ports.json");
-  const datafileIntelbras: string = path.resolve("data", "intelbras.json");
-  const datafileHikvision: string = path.resolve("data", "hikvision.json");
+  const protocol = getDeviceProtocol();
 
   try {
+    if (options.info) {
+      const credentials = {
+        intelbras: {
+          user: getRequiredEnv("INTELBRAS_USER"),
+          password: getRequiredEnv("INTELBRAS_PWD"),
+        },
+        hikvision: {
+          user: getRequiredEnv("HIKVISION_USER"),
+          password: getRequiredEnv("HIKVISION_PWD"),
+        },
+      };
+
+      for (const address of hosts) {
+        const inventory = await queryCondominium({
+          host: address,
+          startPort,
+          endPort,
+          credentials,
+          protocol,
+        });
+        console.log(JSON.stringify(inventory, null, 2));
+      }
+      return;
+    }
+
+    const credentials: InventoryCredentials = {
+      intelbras: {
+        user: getRequiredEnv("INTELBRAS_USER"),
+        password: getRequiredEnv("INTELBRAS_PWD"),
+      },
+      hikvision: {
+        user: getRequiredEnv("HIKVISION_USER"),
+        password: getRequiredEnv("HIKVISION_PWD"),
+      },
+    };
+
     for (const address of hosts) {
-      // scan ports
-      await runScanList(scanPortsFile, address, startPort, endPort);
+      const scanResult = await scanPortList(address, startPort, endPort);
+      const { hosts: openPorts } = JSON.parse(scanResult.message) as {
+        hosts: string[];
+      };
 
-      // Hikvision
-      await runGetConfig(hikvision, address, datafileHikvision, scanPortsFile);
-      await runSetConfig(hikvision, address, datafileHikvision);
+      for (const port of openPorts) {
+        validateHost(port);
+      }
 
-      // Intelbras
-      await runGetConfig(intelbras, address, datafileIntelbras, scanPortsFile);
-      await runSetConfig(intelbras, address, datafileIntelbras);
+      log.info(
+        `SCAN_PORTS ${address}: Found ${openPorts.length} open port(s)`,
+      );
 
-      if (options.autoReboot) {
-        // Auto Reboot Intelbras
-        await runSetAutoMaintainReboot(intelbras, address, scanPortsFile);
+      const pLimit = promisesLimit();
+      const vendorMap = new Map<string, DeviceVendor>();
+      await Promise.all(
+        openPorts.map((port) =>
+          pLimit(async () => {
+            const vendor = await detectVendor(port, credentials, protocol);
+            vendorMap.set(port, vendor);
+            log.info(`DETECT_VENDOR ${port}: ${vendor}`);
+          }),
+        ),
+      );
+
+      const hikvisionPorts = openPorts.filter((p) => vendorMap.get(p) === "HIKVISION");
+      const intelbrasPorts = openPorts.filter((p) => vendorMap.get(p) === "INTELBRAS");
+
+      if (hikvisionPorts.length > 0) {
+        const hikvisionConfigs = await runGetConfig(hikvision, address, hikvisionPorts);
+        await runSetConfig(hikvision, address, hikvisionConfigs);
+      }
+
+      if (intelbrasPorts.length > 0) {
+        const intelbrasConfigs = await runGetConfig(intelbras, address, intelbrasPorts);
+        await runSetConfig(intelbras, address, intelbrasConfigs);
+
+        if (options.autoReboot) {
+          await runSetAutoMaintainReboot(intelbras, address, intelbrasConfigs);
+        }
       }
     }
   } catch (error: unknown) {

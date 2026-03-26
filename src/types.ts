@@ -20,10 +20,10 @@ export interface RequestResult {
 }
 
 export interface SipService {
-  getConfigSip(filename: string): Promise<DefaultResponse>;
-  setTimeoutSip(filename: string): Promise<DefaultResponse>;
+  getConfigSip(hosts: string[]): Promise<DefaultResponse>;
+  setTimeoutSip(configs: HostConfig[]): Promise<DefaultResponse>;
 }
 
 export interface AutoMaintain {
-  setAutoMaintainReboot(filename: string): Promise<DefaultResponse>;
+  setAutoMaintainReboot(configs: HostConfig[]): Promise<DefaultResponse>;
 }

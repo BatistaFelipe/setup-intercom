@@ -7,10 +7,22 @@
     "npm": "11.6.2"
   },
   "main": "dist/src/index.js",
+  "exports": {
+    ".": {
+      "import": "./dist/src/index.js",
+      "types": "./dist/src/index.d.ts"
+    },
+    "./inventory": {
+      "import": "./dist/src/inventory/index.js",
+      "types": "./dist/src/inventory/index.d.ts"
+    }
+  },
   "scripts": {
     "build": "npx tsc",
     "start": "node dist/src/index.js",
-    "dev": "npx tsc && node dist/src/index.js"
+    "dev": "npx tsc && node dist/src/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "keywords": [],
   "author": "",
@@ -27,6 +39,7 @@
   },
   "devDependencies": {
     "@types/node": "^25.0.10",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.2"
   }
 }
