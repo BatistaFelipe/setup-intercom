@@ -97,7 +97,7 @@ describe("intelbrasInventory.probe", () => {
 
     const result = await intelbrasInventory.probe(
       "10.0.0.1:8084",
-      "admin:pass",
+      { user: "admin", password: "pass" },
     );
     expect(result).toBe(true);
     expect(mockRequest).toHaveBeenCalledOnce();
@@ -109,7 +109,7 @@ describe("intelbrasInventory.probe", () => {
 
     const result = await intelbrasInventory.probe(
       "10.0.0.1:8084",
-      "admin:pass",
+      { user: "admin", password: "pass" },
     );
     expect(result).toBe(false);
   });
@@ -128,7 +128,7 @@ describe("intelbrasInventory.probe", () => {
 
     const result = await intelbrasInventory.probe(
       "10.0.0.1:8089",
-      "admin:pass",
+      { user: "admin", password: "pass" },
     );
     expect(result).toBe(false);
   });
@@ -138,7 +138,7 @@ describe("intelbrasInventory.probe", () => {
 
     const result = await intelbrasInventory.probe(
       "10.0.0.1:8084",
-      "admin:pass",
+      { user: "admin", password: "pass" },
     );
     expect(result).toBe(false);
   });
@@ -157,7 +157,7 @@ describe("intelbrasInventory.collect", () => {
 
     const result = await intelbrasInventory.collect(
       "10.0.0.1:8084",
-      "admin:pass",
+      { user: "admin", password: "pass" },
     );
 
     expect(result.address).toBe("10.0.0.1:8084");
@@ -189,7 +189,7 @@ describe("intelbrasInventory.collect", () => {
 
     const result = await intelbrasInventory.collect(
       "10.0.0.1:8084",
-      "admin:pass",
+      { user: "admin", password: "pass" },
     );
 
     expect(result.vendor).toBe("INTELBRAS");
@@ -211,7 +211,7 @@ describe("intelbrasInventory.collect", () => {
       );
     }
 
-    await intelbrasInventory.collect("10.0.0.1:8084", "admin:pass");
+    await intelbrasInventory.collect("10.0.0.1:8084", { user: "admin", password: "pass" });
     expect(mockRequest).toHaveBeenCalledTimes(7);
   });
 });

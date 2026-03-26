@@ -4,6 +4,8 @@ import {
   validatePortRange,
   getRequiredEnv,
   getRequiredNumberEnv,
+  getDeviceProtocol,
+  sanitizeLogMessage,
   UnknownError,
 } from "../utils.js";
 
@@ -56,6 +58,14 @@ describe("validatePortRange", () => {
 
   it("rejects non-integer ports", () => {
     expect(() => validatePortRange(80.5, 8099)).toThrow("START_PORT");
+  });
+
+  it("rejects port range exceeding maximum size", () => {
+    expect(() => validatePortRange(1, 1001)).toThrow("Port range too large");
+  });
+
+  it("accepts port range at maximum size", () => {
+    expect(() => validatePortRange(1, 1000)).not.toThrow();
   });
 });
 
@@ -118,6 +128,55 @@ describe("getRequiredNumberEnv", () => {
     expect(() => getRequiredNumberEnv("TEST_NUM")).toThrow(
       "Missing required environment variable",
     );
+  });
+});
+
+describe("sanitizeLogMessage", () => {
+  it("redacts password fields in text", () => {
+    const msg = 'password="secret123" other data';
+    expect(sanitizeLogMessage(msg)).not.toContain("secret123");
+  });
+
+  it("redacts XML password elements", () => {
+    const msg = "<password>mysecret</password>";
+    expect(sanitizeLogMessage(msg)).not.toContain("mysecret");
+  });
+
+  it("redacts digestAuth values", () => {
+    const msg = 'digestAuth="admin:pass123"';
+    expect(sanitizeLogMessage(msg)).not.toContain("pass123");
+  });
+
+  it("leaves non-sensitive messages unchanged", () => {
+    const msg = "Connection failed for 10.0.0.1:8084";
+    expect(sanitizeLogMessage(msg)).toBe(msg);
+  });
+});
+
+describe("getDeviceProtocol", () => {
+  const ORIGINAL_ENV = process.env;
+
+  beforeEach(() => {
+    process.env = { ...ORIGINAL_ENV };
+  });
+
+  afterEach(() => {
+    process.env = ORIGINAL_ENV;
+  });
+
+  it("returns http by default", () => {
+    delete process.env.DEVICE_PROTOCOL;
+    expect(getDeviceProtocol()).toBe("http");
+  });
+
+  it("returns https when configured", () => {
+    process.env.DEVICE_PROTOCOL = "https";
+    expect(getDeviceProtocol()).toBe("https");
+  });
+
+  it("throws on invalid protocol", () => {
+    process.env.DEVICE_PROTOCOL = "ftp";
+    expect(() => getDeviceProtocol()).toThrow('DEVICE_PROTOCOL must be "http" or "https"');
   });
 });
 

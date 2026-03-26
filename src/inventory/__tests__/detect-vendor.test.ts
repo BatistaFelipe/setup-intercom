@@ -54,7 +54,7 @@ describe("detectVendor", () => {
     expect(result).toBe("KHOMP");
   });
 
-  it("passes correct digest auth for each vendor", async () => {
+  it("passes credential objects directly to each vendor probe", async () => {
     mockIntelbrasProbe.mockResolvedValueOnce(false);
     mockHikvisionProbe.mockResolvedValueOnce(true);
 
@@ -62,11 +62,13 @@ describe("detectVendor", () => {
 
     expect(mockIntelbrasProbe).toHaveBeenCalledWith(
       "10.0.0.1:8084",
-      "admin:pass",
+      { user: "admin", password: "pass" },
+      "http",
     );
     expect(mockHikvisionProbe).toHaveBeenCalledWith(
       "10.0.0.1:8084",
-      "admin:pass",
+      { user: "admin", password: "pass" },
+      "http",
     );
   });
 });

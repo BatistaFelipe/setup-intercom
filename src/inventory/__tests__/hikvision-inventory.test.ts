@@ -91,7 +91,7 @@ describe("hikvisionInventory.probe", () => {
 
     const result = await hikvisionInventory.probe(
       "10.0.0.1:8084",
-      "admin:pass",
+      { user: "admin", password: "pass" },
     );
     expect(result).toBe(true);
     expect(mockRequest.mock.calls[0][0]).toContain("/ISAPI/System/deviceInfo");
@@ -102,7 +102,7 @@ describe("hikvisionInventory.probe", () => {
 
     const result = await hikvisionInventory.probe(
       "10.0.0.1:8084",
-      "admin:pass",
+      { user: "admin", password: "pass" },
     );
     expect(result).toBe(false);
   });
@@ -113,7 +113,7 @@ describe("hikvisionInventory.probe", () => {
 
     const result = await hikvisionInventory.probe(
       "10.0.0.1:8089",
-      "admin:pass",
+      { user: "admin", password: "pass" },
     );
     expect(result).toBe(false);
   });
@@ -123,7 +123,7 @@ describe("hikvisionInventory.probe", () => {
 
     const result = await hikvisionInventory.probe(
       "10.0.0.1:8084",
-      "admin:pass",
+      { user: "admin", password: "pass" },
     );
     expect(result).toBe(false);
   });
@@ -139,7 +139,7 @@ describe("hikvisionInventory.collect", () => {
 
     const result = await hikvisionInventory.collect(
       "10.0.0.1:8084",
-      "admin:pass",
+      { user: "admin", password: "pass" },
     );
 
     expect(result.address).toBe("10.0.0.1:8084");
@@ -166,7 +166,7 @@ describe("hikvisionInventory.collect", () => {
 
     const result = await hikvisionInventory.collect(
       "10.0.0.1:8084",
-      "admin:pass",
+      { user: "admin", password: "pass" },
     );
 
     expect(result.vendor).toBe("HIKVISION");
@@ -193,7 +193,7 @@ describe("hikvisionInventory.collect", () => {
 
     const result = await hikvisionInventory.collect(
       "10.0.0.1:8084",
-      "admin:pass",
+      { user: "admin", password: "pass" },
     );
 
     expect(result.macAddress).toBe("e0:ca:3c:eb:54:f1");
@@ -206,7 +206,7 @@ describe("hikvisionInventory.collect", () => {
       );
     }
 
-    await hikvisionInventory.collect("10.0.0.1:8084", "admin:pass");
+    await hikvisionInventory.collect("10.0.0.1:8084", { user: "admin", password: "pass" });
     expect(mockRequest).toHaveBeenCalledTimes(4);
   });
 });
