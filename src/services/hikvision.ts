@@ -9,13 +9,21 @@ import {
 } from "../types.js";
 import { xml2json } from "xml-js";
 import xmlbuilder from "xmlbuilder";
-import { promisesLimit, UnknownError } from "../utils.js";
+import {
+  promisesLimit,
+  UnknownError,
+  getRequiredEnv,
+  getRequiredNumberEnv,
+  log,
+} from "../utils.js";
 
 const pLimit = promisesLimit();
 
-let options = {
-  digestAuth: `${process.env.HIKVISION_USER}:${process.env.HIKVISION_PWD}`,
-};
+const HTTP_TIMEOUT = 5000;
+
+const options = Object.freeze({
+  digestAuth: `${getRequiredEnv("HIKVISION_USER")}:${getRequiredEnv("HIKVISION_PWD")}`,
+});
 
 const getConfigSip = async (filename: string): Promise<DefaultResponse> => {
   try {
@@ -24,17 +32,18 @@ const getConfigSip = async (filename: string): Promise<DefaultResponse> => {
 
     const promises = hostConfig.hosts.map((host) =>
       pLimit(async () => {
+        const address = typeof host === "string" ? host : host.host;
         try {
-          const address = typeof host === "string" ? host : host.host;
           const url: string = `http://${address}/ISAPI/System/Network/SIP`;
           const { data, res } = await request(url, {
             ...options,
             method: "GET",
+            timeout: HTTP_TIMEOUT,
           });
 
           if (res.status === 200 && data) {
             const result = JSON.parse(
-              xml2json(data, { compact: true, spaces: 4 }),
+              xml2json(data.toString(), { compact: true, spaces: 4 }),
             );
             const extension: number =
               result["SIPServerList"]["SIPServer"]["Standard"]["authID"][
@@ -55,6 +64,8 @@ const getConfigSip = async (filename: string): Promise<DefaultResponse> => {
           }
           return null;
         } catch (error: unknown) {
+          const msg = error instanceof Error ? error.message : "Unknown error";
+          log.warn(`Hikvision getConfigSip failed for ${address}: ${msg}`);
           return null;
         }
       }),
@@ -93,7 +104,7 @@ const postXmlBody = (extension: number): string => {
 
 const setTimeoutSip = async (filename: string): Promise<DefaultResponse> => {
   try {
-    const SIP_TIMEOUT: number = Number(process.env.SIP_TIMEOUT_HIKVISION);
+    const SIP_TIMEOUT: number = getRequiredNumberEnv("SIP_TIMEOUT_HIKVISION");
     const fileData: string = await readFile(filename, "utf-8");
     const hostConfig: { hosts: HostConfig[] } = JSON.parse(fileData);
 
@@ -102,12 +113,13 @@ const setTimeoutSip = async (filename: string): Promise<DefaultResponse> => {
         if (Number(host.sipTimeout) !== SIP_TIMEOUT) {
           const address = typeof host === "string" ? host : host.host;
           const url: string = `http://${address}/ISAPI/System/Network/SIP`;
-          const body: string = postXmlBody(host.extension);
+          const body: string = postXmlBody(host.extension!);
 
           const { data, res } = await request(url, {
             ...options,
             method: "PUT",
             data: body,
+            timeout: HTTP_TIMEOUT,
           });
 
           if (res.status === 200 && data) {

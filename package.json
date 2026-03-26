@@ -19,15 +19,14 @@
   "dependencies": {
     "commander": "^14.0.2",
     "dotenv": "^17.2.3",
-    "net": "^1.0.2",
     "p-limit": "^7.2.0",
-    "typescript": "^5.9.3",
     "urllib": "^4.9.0",
     "winston": "^3.19.0",
     "xml-js": "^1.6.11",
     "xmlbuilder": "^15.1.1"
   },
   "devDependencies": {
-    "@types/node": "^25.0.10"
+    "@types/node": "^25.0.10",
+    "typescript": "^5.9.3"
   }
 }

@@ -16,18 +16,18 @@ export async function runGetConfig(
     await object.getConfigSip(scanPortsFile);
   if (!timeoutSipList.success) {
     log.error(
-      `❌ ${host}: Erro ao buscar SIP.RegExpiration! - ${timeoutSipList.message}`,
+      `GET_CONFIG ${host}: Failed to fetch SIP.RegExpiration - ${timeoutSipList.message}`,
     );
     return;
   }
   const statusSave = await saveToFile(datafile, timeoutSipList.message);
   if (!statusSave.success) {
     log.error(
-      `❌ ${datafile} ${host}: Erro ao salvar arquivo!\n${statusSave.message}`,
+      `GET_CONFIG ${datafile} ${host}: Failed to save file - ${statusSave.message}`,
     );
     return;
   }
-  log.info(`✅ ${datafile} ${host}: Arquivo salvo com sucesso!`);
+  log.info(`GET_CONFIG ${datafile} ${host}: File saved successfully`);
 }
 
 export async function runSetConfig(
@@ -38,7 +38,7 @@ export async function runSetConfig(
   const setTimeoutSip: DefaultResponse = await object.setTimeoutSip(datafile);
   if (!setTimeoutSip.success) {
     log.error(
-      `❌ SET_TIMEOUT_SIP ${host}: Erro ao configurar dispositivo!\n${setTimeoutSip.message}`,
+      `SET_TIMEOUT_SIP ${host}: Failed to configure device - ${setTimeoutSip.message}`,
     );
     return;
   }
@@ -48,13 +48,12 @@ export async function runSetConfig(
 
     for (const item of results) {
       log.info(
-        `✅ SET_TIMEOUT_SIP - host: ${item.host} status: ${item.status_code}`,
+        `SET_TIMEOUT_SIP - host: ${item.host} status: ${item.status_code}`,
       );
     }
-  } catch (error) {
-    log.error(
-      `❌ SET_TIMEOUT_SIP - Erro: ${error.message || "Erro desconhecido"}`,
-    );
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : "Unknown error";
+    log.error(`SET_TIMEOUT_SIP - Error: ${msg}`);
   }
 }
 
@@ -67,7 +66,7 @@ export async function runSetAutoMaintainReboot(
     await object.setAutoMaintainReboot(datafile);
   if (!setAutoMaintainReboot.success) {
     log.error(
-      `❌ SET_AUTO_MAINTAIN_REBOOT ${host}: Erro ao configurar dispositivo!\n${setAutoMaintainReboot.message}`,
+      `SET_AUTO_MAINTAIN_REBOOT ${host}: Failed to configure device - ${setAutoMaintainReboot.message}`,
     );
     return;
   }
@@ -77,12 +76,11 @@ export async function runSetAutoMaintainReboot(
 
     for (const item of results) {
       log.info(
-        `✅ SET_AUTO_MAINTAIN_REBOOT - host: ${item.host} status: ${item.status_code}`,
+        `SET_AUTO_MAINTAIN_REBOOT - host: ${item.host} status: ${item.status_code}`,
       );
     }
-  } catch (error) {
-    log.error(
-      `❌ SET_AUTO_MAINTAIN_REBOOT - Erro: ${error.message || "Erro desconhecido"}`,
-    );
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : "Unknown error";
+    log.error(`SET_AUTO_MAINTAIN_REBOOT - Error: ${msg}`);
   }
 }

@@ -7,15 +7,22 @@ import {
   DefaultResponse,
   RequestResult,
 } from "../types.js";
-import { promisesLimit, UnknownError } from "../utils.js";
+import {
+  promisesLimit,
+  UnknownError,
+  getRequiredEnv,
+  getRequiredNumberEnv,
+  log,
+} from "../utils.js";
 
 const pLimit = promisesLimit();
 
-// Intelbras API https://intelbras-caco-api.intelbras.com.br/
-let options = {
+const HTTP_TIMEOUT = 5000;
+
+const options = Object.freeze({
   headers: { "Content-type": "text/plain;charset=utf-8" },
-  digestAuth: `${process.env.INTELBRAS_USER}:${process.env.INTELBRAS_PWD}`,
-};
+  digestAuth: `${getRequiredEnv("INTELBRAS_USER")}:${getRequiredEnv("INTELBRAS_PWD")}`,
+});
 
 const parseIntelbrasResponse = (text: string) => {
   const [label, value] = text.split("=");
@@ -30,17 +37,18 @@ const getConfigSip = async (filename: string): Promise<DefaultResponse> => {
 
     const promises = obj.hosts.map((host) =>
       pLimit(async () => {
+        const address = typeof host === "string" ? host : host.host;
         try {
-          const address = typeof host === "string" ? host : host.host;
           const url: string = `http://${address}/cgi-bin/configManager.cgi?action=getConfig&name=SIP.RegExpiration`;
           const { data, res } = await request(url, {
             ...options,
             method: "GET",
+            timeout: HTTP_TIMEOUT,
           });
 
           if (res.status === 200 && data) {
             const sipInfo: HostConfig = parseIntelbrasResponse(data.toString());
-            if (sipInfo.sipTimeout) {
+            if (sipInfo.sipTimeout != null) {
               const sipInfoObject: HostConfig = {
                 host: address,
                 sipTimeout: Number(sipInfo.sipTimeout),
@@ -51,6 +59,8 @@ const getConfigSip = async (filename: string): Promise<DefaultResponse> => {
           }
           return null;
         } catch (error: unknown) {
+          const msg = error instanceof Error ? error.message : "Unknown error";
+          log.warn(`Intelbras getConfigSip failed for ${address}: ${msg}`);
           return null;
         }
       }),
@@ -70,7 +80,7 @@ const getConfigSip = async (filename: string): Promise<DefaultResponse> => {
 
 const setTimeoutSip = async (filename: string): Promise<DefaultResponse> => {
   try {
-    const SIP_TIMEOUT: number = Number(process.env.SIP_TIMEOUT_INTELBRAS);
+    const SIP_TIMEOUT: number = getRequiredNumberEnv("SIP_TIMEOUT_INTELBRAS");
     const fileData: string = await readFile(filename, "utf-8");
     const hostConfig: { hosts: HostConfig[] } = JSON.parse(fileData);
 
@@ -78,10 +88,12 @@ const setTimeoutSip = async (filename: string): Promise<DefaultResponse> => {
       pLimit(async () => {
         if (host.sipTimeout !== SIP_TIMEOUT) {
           const address = typeof host === "string" ? host : host.host;
-          const url: string = `http://${address}/cgi-bin/configManager.cgi?action=setConfig&SIP.RegExpiration=${SIP_TIMEOUT}`;
+          const encodedTimeout = encodeURIComponent(String(SIP_TIMEOUT));
+          const url: string = `http://${address}/cgi-bin/configManager.cgi?action=setConfig&SIP.RegExpiration=${encodedTimeout}`;
           const { data, res } = await request(url, {
             ...options,
             method: "GET",
+            timeout: HTTP_TIMEOUT,
           });
 
           if (res.status === 200 && data) {
@@ -110,8 +122,8 @@ const setAutoMaintainReboot = async (
 ): Promise<DefaultResponse> => {
   try {
     const AUTOREBOOTDAY: number = Number(process.env.AUTOREBOOTDAY) || 7;
-    const AUTOREBOOTENABLE: boolean =
-      Boolean(process.env.AUTOREBOOTENABLE) || true;
+    const raw = process.env.AUTOREBOOTENABLE ?? "true";
+    const AUTOREBOOTENABLE: boolean = raw.toLowerCase() === "true";
     const AUTOREBOOTHOUR: number = Number(process.env.AUTOREBOOTHOUR) || 4;
     const fileData: string = await readFile(filename, "utf-8");
     const hostConfig: { hosts: HostConfig[] } = JSON.parse(fileData);
@@ -119,21 +131,27 @@ const setAutoMaintainReboot = async (
     const promises = hostConfig.hosts.map((host: HostConfig) =>
       pLimit(async () => {
         const address = typeof host === "string" ? host : host.host;
-        const queryParams: string = `AutoMaintain.AutoRebootDay=${AUTOREBOOTDAY}&AutoMaintain.AutoRebootEnable=${AUTOREBOOTENABLE}&AutoMaintain.AutoRebootHour=${AUTOREBOOTHOUR}`;
-        const url: string = `http://${address}/cgi-bin/configManager.cgi?action=setConfig&${queryParams}`;
+        const params = [
+          `AutoMaintain.AutoRebootDay=${encodeURIComponent(String(AUTOREBOOTDAY))}`,
+          `AutoMaintain.AutoRebootEnable=${encodeURIComponent(String(AUTOREBOOTENABLE))}`,
+          `AutoMaintain.AutoRebootHour=${encodeURIComponent(String(AUTOREBOOTHOUR))}`,
+        ].join("&");
+        const url: string = `http://${address}/cgi-bin/configManager.cgi?action=setConfig&${params}`;
         const { data, res } = await request(url, {
           ...options,
           method: "GET",
+          timeout: HTTP_TIMEOUT,
         });
 
-        let textResponse: string;
+        let textResponse: string = "";
 
         if (res.status === 200 && data) {
           textResponse = data.toString().replace(/\s/g, "");
         }
 
-        if (textResponse == "OK")
+        if (textResponse === "OK") {
           return { host: address, data: textResponse, status_code: 200 };
+        }
 
         return null;
       }),
