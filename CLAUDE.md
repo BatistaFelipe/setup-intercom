@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-CLI tool for bulk-configuring SIP timeout and auto-reboot settings on **Intelbras** and **Hikvision** intercoms. It scans a port range on target hosts to discover devices, reads their current SIP configuration via vendor-specific HTTP APIs (CGI for Intelbras, ISAPI/XML for Hikvision), and pushes updated settings. Both vendors use digest authentication.
+CLI tool and Node.js library for managing **Intelbras**, **Hikvision**, and **Khomp** intercoms. It scans port ranges on target hosts to discover devices, reads SIP configuration via vendor-specific HTTP APIs (CGI for Intelbras, ISAPI/XML for Hikvision), pushes updated settings, and collects real-time device inventory. Both vendors use digest authentication. Khomp devices have no API and are detected by elimination.
 
 ## Commands
 
@@ -12,6 +12,8 @@ CLI tool for bulk-configuring SIP timeout and auto-reboot settings on **Intelbra
 npm run build        # Compile TypeScript (npx tsc)
 npm run start        # Run compiled output (node dist/src/index.js)
 npm run dev          # Build + run in one step
+npm test             # Run tests (vitest)
+npm run test:watch   # Run tests in watch mode
 ```
 
 ### CLI flags
@@ -20,36 +22,66 @@ npm run dev          # Build + run in one step
 node dist/src/index.js -d <host>       # Target a single host (overrides DST_HOST)
 node dist/src/index.js -r              # Read hosts from data/hosts.json
 node dist/src/index.js -a              # Enable auto-reboot config (Intelbras only)
+node dist/src/index.js -i              # Query device inventory (prints JSON to stdout)
+node dist/src/index.js -i -d <host>    # Inventory for a single host
+node dist/src/index.js -i -r           # Inventory for all hosts in hosts.json
 ```
 
 ## Architecture
 
 ```
 src/
-  index.ts          # CLI entry point (commander). Parses args, loops over hosts.
-  orchestrator.ts   # Workflow functions: runGetConfig, runSetConfig, runSetAutoMaintainReboot.
-                    # Accepts a SipService/AutoMaintain object (vendor adapter) and delegates.
-  types.ts          # Shared interfaces: DefaultResponse, HostConfig, SipService, AutoMaintain.
-  utils.ts          # Logger (winston), file I/O helpers, UnknownError, p-limit concurrency wrapper.
+  index.ts            # CLI entry point (commander). Parses args, loops over hosts.
+  orchestrator.ts     # Workflow functions: runGetConfig, runSetConfig, runSetAutoMaintainReboot.
+                      # Accepts SipService/AutoMaintain objects and delegates.
+  types.ts            # Shared interfaces: DefaultResponse, HostConfig, SipService, AutoMaintain.
+  utils.ts            # Logger (winston), validation helpers, UnknownError, p-limit wrapper.
   services/
-    scan-ports.ts   # TCP port scanner (net.Socket). Scans startPort..endPort, saves open ports to JSON.
-    intelbras.ts    # Intelbras adapter. CGI API with digest auth. Implements SipService + AutoMaintain.
-    hikvision.ts    # Hikvision adapter. ISAPI XML API with digest auth. Implements SipService.
+    scan-ports.ts     # TCP port scanner (net.Socket). Exports scanPort and scanPortList.
+    intelbras.ts      # Intelbras SIP adapter. CGI API with digest auth.
+    hikvision.ts      # Hikvision SIP adapter. ISAPI XML API with digest auth.
+  inventory/
+    index.ts          # Barrel re-exports: queryCondominium, queryDevice, types.
+    types.ts          # Inventory interfaces: DeviceInventory, CondominiumInventory, etc.
+    query.ts          # Orchestration: queryCondominium (scan+detect+collect), queryDevice.
+    detect-vendor.ts  # Vendor detection: probe Intelbras -> Hikvision -> Khomp fallback.
+    intelbras-inventory.ts  # Intelbras CGI inventory adapter (7 endpoints, read-only).
+    hikvision-inventory.ts  # Hikvision ISAPI inventory adapter (4 endpoints, read-only).
+    __tests__/        # Vitest unit tests for all inventory modules.
+  __tests__/          # Vitest unit tests for utils and scan-ports.
 data/
-  hosts.json        # Input: list of host addresses for --read-file mode.
-  scan-ports.json   # Generated: open ports from last scan.
-  hikvision.json    # Generated: Hikvision device SIP configs.
-  intelbras.json    # Generated: Intelbras device SIP configs.
-  combined.log      # Generated: winston log output.
+  hosts.json          # Input: list of host addresses for --read-file mode.
+  combined.log        # Generated: winston log output.
+docs/
+  api-intelbras.md    # Intelbras CGI endpoint documentation with response examples.
+  api-hikvision.md    # Hikvision ISAPI endpoint documentation with response examples.
 ```
 
 ### Key patterns
 
 - **Vendor adapters**: `intelbras.ts` and `hikvision.ts` export objects conforming to the `SipService` interface. The orchestrator is vendor-agnostic.
+- **In-memory data flow**: All data passes between pipeline steps in memory (no intermediate JSON files). Port scan results, configs, and inventory are passed as function parameters.
 - **Concurrency**: All HTTP requests use `p-limit(10)` via `promisesLimit()` in utils.
-- **Data flow**: scan ports -> save open hosts to JSON -> read JSON to get/set SIP config per vendor -> save results to vendor JSON files.
 - **HTTP client**: `urllib` with digest authentication for both vendors.
 - **XML handling** (Hikvision only): `xml-js` for parsing responses, `xmlbuilder` for constructing PUT bodies.
+- **Inventory module**: Exported as a Node.js library (`import { queryCondominium } from 'setup-sip-timeout-intercom/inventory'`). Credentials are passed as parameters, not read from env.
+
+### Library usage (Slack bot integration)
+
+```typescript
+import { queryCondominium, queryDevice } from 'setup-sip-timeout-intercom/inventory'
+
+const result = await queryCondominium({
+  host: 'ddns.example.codeseg.io',
+  startPort: 8084,
+  endPort: 8099,
+  credentials: {
+    intelbras: { user: 'admin', password: 'secret' },
+    hikvision: { user: 'admin', password: 'secret' },
+  },
+})
+// Returns: CondominiumInventory { host, queriedAt, devices[], errors[] }
+```
 
 ## Environment Variables
 
@@ -72,4 +104,4 @@ Configured in `.env` (loaded via `dotenv/config`):
 
 - **Runtime**: Node.js 24.13.0 (see `.nvmrc`)
 - **Language**: TypeScript (ESM, `"type": "module"`, `NodeNext` module resolution)
-- **No test framework configured** - no tests exist yet.
+- **Testing**: Vitest (unit tests in `__tests__/` directories)
