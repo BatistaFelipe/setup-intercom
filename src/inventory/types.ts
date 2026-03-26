@@ -1,4 +1,10 @@
 export type DeviceVendor = "INTELBRAS" | "HIKVISION" | "KHOMP";
+export type DeviceProtocol = "http" | "https";
+
+export interface VendorCredentials {
+  readonly user: string;
+  readonly password: string;
+}
 
 export interface AutoRebootStatus {
   readonly enabled: boolean;
@@ -42,14 +48,16 @@ export interface QueryCondominiumOptions {
   readonly startPort: number;
   readonly endPort: number;
   readonly credentials: InventoryCredentials;
+  readonly protocol?: DeviceProtocol;
 }
 
 export interface QueryDeviceOptions {
   readonly address: string;
   readonly credentials: InventoryCredentials;
+  readonly protocol?: DeviceProtocol;
 }
 
 export interface VendorInventoryAdapter {
-  probe(address: string, digestAuth: string): Promise<boolean>;
-  collect(address: string, digestAuth: string): Promise<DeviceInventory>;
+  probe(address: string, credentials: VendorCredentials, protocol?: DeviceProtocol): Promise<boolean>;
+  collect(address: string, credentials: VendorCredentials, protocol?: DeviceProtocol): Promise<DeviceInventory>;
 }

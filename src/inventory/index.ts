@@ -5,6 +5,8 @@ export type {
   CondominiumInventory,
   DeviceInventory,
   DeviceVendor,
+  DeviceProtocol,
+  VendorCredentials,
   InventoryCredentials,
   AutoRebootStatus,
   InventoryError,

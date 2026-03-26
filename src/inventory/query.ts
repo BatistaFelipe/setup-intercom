@@ -8,6 +8,7 @@ import type {
   QueryDeviceOptions,
   CondominiumInventory,
   DeviceInventory,
+  DeviceProtocol,
   InventoryError,
   InventoryCredentials,
   DeviceVendor,
@@ -19,15 +20,14 @@ async function collectByVendor(
   address: string,
   vendor: DeviceVendor,
   credentials: InventoryCredentials,
+  protocol: DeviceProtocol = "http",
 ): Promise<DeviceInventory> {
   if (vendor === "INTELBRAS") {
-    const auth = `${credentials.intelbras.user}:${credentials.intelbras.password}`;
-    return intelbrasCollect(address, auth);
+    return intelbrasCollect(address, credentials.intelbras, protocol);
   }
 
   if (vendor === "HIKVISION") {
-    const auth = `${credentials.hikvision.user}:${credentials.hikvision.password}`;
-    return hikvisionCollect(address, auth);
+    return hikvisionCollect(address, credentials.hikvision, protocol);
   }
 
   return {
@@ -51,6 +51,8 @@ export async function queryCondominium(
   validateHost(options.host);
   validatePortRange(options.startPort, options.endPort);
 
+  const protocol = options.protocol ?? "http";
+
   const scanResult = await scanPortList(
     options.host,
     options.startPort,
@@ -60,17 +62,22 @@ export async function queryCondominium(
     hosts: string[];
   };
 
+  for (const addr of openPorts) {
+    validateHost(addr);
+  }
+
   const devices: DeviceInventory[] = [];
   const errors: InventoryError[] = [];
 
   const tasks = openPorts.map((address) =>
     pLimit(async () => {
       try {
-        const vendor = await detectVendor(address, options.credentials);
+        const vendor = await detectVendor(address, options.credentials, protocol);
         const device = await collectByVendor(
           address,
           vendor,
           options.credentials,
+          protocol,
         );
         devices.push(device);
       } catch (error: unknown) {
@@ -93,12 +100,13 @@ export async function queryCondominium(
 export async function queryDevice(
   options: QueryDeviceOptions,
 ): Promise<DeviceInventory> {
-  const { address, credentials } = options;
+  const { address, credentials, protocol = "http" } = options;
 
   if (!address || !address.includes(":")) {
     throw new Error(`Invalid device address: ${address}`);
   }
+  validateHost(address);
 
-  const vendor = await detectVendor(address, credentials);
-  return collectByVendor(address, vendor, credentials);
+  const vendor = await detectVendor(address, credentials, protocol);
+  return collectByVendor(address, vendor, credentials, protocol);
 }

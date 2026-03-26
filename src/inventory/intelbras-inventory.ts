@@ -1,5 +1,5 @@
 import { request } from "urllib";
-import type { DeviceInventory, AutoRebootStatus, VendorInventoryAdapter } from "./types.js";
+import type { DeviceInventory, AutoRebootStatus, DeviceProtocol, VendorCredentials, VendorInventoryAdapter } from "./types.js";
 
 const HTTP_TIMEOUT = 5000;
 
@@ -24,15 +24,16 @@ export function parseCgiTable(text: string): Record<string, string> {
 
 async function fetchCgi(
   address: string,
-  path: string,
-  digestAuth: string,
+  cgiPath: string,
+  credentials: VendorCredentials,
+  protocol: DeviceProtocol = "http",
 ): Promise<string | null> {
   try {
-    const url = `http://${address}${path}`;
+    const url = `${protocol}://${address}${cgiPath}`;
     const { data, res } = await request(url, {
       method: "GET",
       timeout: HTTP_TIMEOUT,
-      digestAuth,
+      digestAuth: `${credentials.user}:${credentials.password}`,
     });
 
     if (res.status === 200 && data) {
@@ -104,12 +105,14 @@ function parseDatetime(text: string | null): string | null {
 
 export async function probe(
   address: string,
-  digestAuth: string,
+  credentials: VendorCredentials,
+  protocol: DeviceProtocol = "http",
 ): Promise<boolean> {
   const text = await fetchCgi(
     address,
     "/cgi-bin/magicBox.cgi?action=getDeviceType",
-    digestAuth,
+    credentials,
+    protocol,
   );
   if (text === null) return false;
   // Reject HTML responses (Khomp devices return HTML login pages on any path)
@@ -119,7 +122,8 @@ export async function probe(
 
 export async function collect(
   address: string,
-  digestAuth: string,
+  credentials: VendorCredentials,
+  protocol: DeviceProtocol = "http",
 ): Promise<DeviceInventory> {
   const [
     deviceTypeRaw,
@@ -130,13 +134,13 @@ export async function collect(
     networkRaw,
     datetimeRaw,
   ] = await Promise.allSettled([
-    fetchCgi(address, "/cgi-bin/magicBox.cgi?action=getDeviceType", digestAuth),
-    fetchCgi(address, "/cgi-bin/magicBox.cgi?action=getSoftwareVersion", digestAuth),
-    fetchCgi(address, "/cgi-bin/magicBox.cgi?action=getSerialNo", digestAuth),
-    fetchCgi(address, "/cgi-bin/configManager.cgi?action=getConfig&name=SIP", digestAuth),
-    fetchCgi(address, "/cgi-bin/configManager.cgi?action=getConfig&name=AutoMaintain", digestAuth),
-    fetchCgi(address, "/cgi-bin/configManager.cgi?action=getConfig&name=Network", digestAuth),
-    fetchCgi(address, "/cgi-bin/global.cgi?action=getCurrentTime", digestAuth),
+    fetchCgi(address, "/cgi-bin/magicBox.cgi?action=getDeviceType", credentials, protocol),
+    fetchCgi(address, "/cgi-bin/magicBox.cgi?action=getSoftwareVersion", credentials, protocol),
+    fetchCgi(address, "/cgi-bin/magicBox.cgi?action=getSerialNo", credentials, protocol),
+    fetchCgi(address, "/cgi-bin/configManager.cgi?action=getConfig&name=SIP", credentials, protocol),
+    fetchCgi(address, "/cgi-bin/configManager.cgi?action=getConfig&name=AutoMaintain", credentials, protocol),
+    fetchCgi(address, "/cgi-bin/configManager.cgi?action=getConfig&name=Network", credentials, protocol),
+    fetchCgi(address, "/cgi-bin/global.cgi?action=getCurrentTime", credentials, protocol),
   ]);
 
   const settled = <T>(r: PromiseSettledResult<T>): T | null =>

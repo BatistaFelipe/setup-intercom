@@ -1,20 +1,21 @@
 import { request } from "urllib";
 import { xml2json } from "xml-js";
-import type { DeviceInventory, VendorInventoryAdapter } from "./types.js";
+import type { DeviceInventory, DeviceProtocol, VendorCredentials, VendorInventoryAdapter } from "./types.js";
 
 const HTTP_TIMEOUT = 5000;
 
 async function fetchIsapi(
   address: string,
-  path: string,
-  digestAuth: string,
+  isapiPath: string,
+  credentials: VendorCredentials,
+  protocol: DeviceProtocol = "http",
 ): Promise<string | null> {
   try {
-    const url = `http://${address}${path}`;
+    const url = `${protocol}://${address}${isapiPath}`;
     const { data, res } = await request(url, {
       method: "GET",
       timeout: HTTP_TIMEOUT,
-      digestAuth,
+      digestAuth: `${credentials.user}:${credentials.password}`,
     });
 
     if (res.status === 200 && data) {
@@ -139,9 +140,10 @@ function parseTime(xml: string | null): string | null {
 
 export async function probe(
   address: string,
-  digestAuth: string,
+  credentials: VendorCredentials,
+  protocol: DeviceProtocol = "http",
 ): Promise<boolean> {
-  const xml = await fetchIsapi(address, "/ISAPI/System/deviceInfo", digestAuth);
+  const xml = await fetchIsapi(address, "/ISAPI/System/deviceInfo", credentials, protocol);
   if (xml === null) return false;
   // Require valid ISAPI XML, reject HTML responses from non-Hikvision devices
   return xml.includes("<DeviceInfo");
@@ -149,14 +151,15 @@ export async function probe(
 
 export async function collect(
   address: string,
-  digestAuth: string,
+  credentials: VendorCredentials,
+  protocol: DeviceProtocol = "http",
 ): Promise<DeviceInventory> {
   const [deviceInfoRaw, sipRaw, interfacesRaw, timeRaw] =
     await Promise.allSettled([
-      fetchIsapi(address, "/ISAPI/System/deviceInfo", digestAuth),
-      fetchIsapi(address, "/ISAPI/System/Network/SIP", digestAuth),
-      fetchIsapi(address, "/ISAPI/System/Network/interfaces", digestAuth),
-      fetchIsapi(address, "/ISAPI/System/time", digestAuth),
+      fetchIsapi(address, "/ISAPI/System/deviceInfo", credentials, protocol),
+      fetchIsapi(address, "/ISAPI/System/Network/SIP", credentials, protocol),
+      fetchIsapi(address, "/ISAPI/System/Network/interfaces", credentials, protocol),
+      fetchIsapi(address, "/ISAPI/System/time", credentials, protocol),
     ]);
 
   const settled = <T>(r: PromiseSettledResult<T>): T | null =>
