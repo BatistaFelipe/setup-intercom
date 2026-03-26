@@ -6,6 +6,7 @@
     "node": "24.13.0",
     "npm": "11.6.2"
   },
+  "files": ["dist", "package.json", "README.md"],
   "main": "dist/src/index.js",
   "exports": {
     ".": {
@@ -18,6 +19,7 @@
     }
   },
   "scripts": {
+    "prepare": "npx tsc",
     "build": "npx tsc",
     "start": "node dist/src/index.js",
     "dev": "npx tsc && node dist/src/index.js",
