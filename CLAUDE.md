@@ -64,7 +64,8 @@ docs/
 - **Concurrency**: All HTTP requests use `p-limit(10)` via `promisesLimit()` in utils.
 - **HTTP client**: `urllib` with digest authentication for both vendors.
 - **XML handling** (Hikvision only): `xml-js` for parsing responses, `xmlbuilder` for constructing PUT bodies.
-- **Inventory module**: Exported as a Node.js library (`import { queryCondominium } from 'setup-sip-timeout-intercom/inventory'`). Credentials are passed as parameters, not read from env.
+- **Inventory module**: Exported as a Node.js library (`import { queryCondominium } from 'setup-sip-timeout-intercom/inventory'`). Credentials and protocol are passed as parameters, not read from env.
+- **Security**: Error messages are sanitized before logging (credentials redacted). Input validation at all boundaries (hosts, ports, file paths). Credential objects passed through the stack (never pre-concatenated strings).
 
 ### Library usage (Slack bot integration)
 
@@ -79,6 +80,7 @@ const result = await queryCondominium({
     intelbras: { user: 'admin', password: 'secret' },
     hikvision: { user: 'admin', password: 'secret' },
   },
+  protocol: 'https', // optional, defaults to 'http'
 })
 // Returns: CondominiumInventory { host, queriedAt, devices[], errors[] }
 ```
@@ -89,8 +91,9 @@ Configured in `.env` (loaded via `dotenv/config`):
 
 | Variable | Purpose |
 |---|---|
-| `START_PORT` / `END_PORT` | Port range for scanning (default 8084-8099) |
+| `START_PORT` / `END_PORT` | Port range for scanning (default 8084-8099, max range 1000) |
 | `DST_HOST` | Default target host |
+| `DEVICE_PROTOCOL` | `http` or `https` for device communication (default `http`) |
 | `HIKVISION_USER` / `HIKVISION_PWD` | Hikvision digest auth |
 | `INTELBRAS_USER` / `INTELBRAS_PWD` | Intelbras digest auth |
 | `SIP_TIMEOUT_HIKVISION` | Desired SIP expiration for Hikvision devices |
