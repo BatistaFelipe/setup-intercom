@@ -10,6 +10,7 @@ import {
   validatePortRange,
   getRequiredEnv,
   getDeviceProtocol,
+  promisesLimit,
 } from "./utils.js";
 import {
   runGetConfig,
@@ -17,6 +18,8 @@ import {
   runSetAutoMaintainReboot,
 } from "./orchestrator.js";
 import { queryCondominium } from "./inventory/query.js";
+import { detectVendor } from "./inventory/detect-vendor.js";
+import type { InventoryCredentials, DeviceVendor } from "./inventory/types.js";
 import { Command } from "commander";
 import { FileData } from "./types.js";
 
@@ -93,6 +96,17 @@ const options = program.opts();
       return;
     }
 
+    const credentials: InventoryCredentials = {
+      intelbras: {
+        user: getRequiredEnv("INTELBRAS_USER"),
+        password: getRequiredEnv("INTELBRAS_PWD"),
+      },
+      hikvision: {
+        user: getRequiredEnv("HIKVISION_USER"),
+        password: getRequiredEnv("HIKVISION_PWD"),
+      },
+    };
+
     for (const address of hosts) {
       const scanResult = await scanPortList(address, startPort, endPort);
       const { hosts: openPorts } = JSON.parse(scanResult.message) as {
@@ -107,24 +121,33 @@ const options = program.opts();
         `SCAN_PORTS ${address}: Found ${openPorts.length} open port(s)`,
       );
 
-      // Hikvision
-      const hikvisionConfigs = await runGetConfig(
-        hikvision,
-        address,
-        openPorts,
+      const pLimit = promisesLimit();
+      const vendorMap = new Map<string, DeviceVendor>();
+      await Promise.all(
+        openPorts.map((port) =>
+          pLimit(async () => {
+            const vendor = await detectVendor(port, credentials, protocol);
+            vendorMap.set(port, vendor);
+            log.info(`DETECT_VENDOR ${port}: ${vendor}`);
+          }),
+        ),
       );
-      await runSetConfig(hikvision, address, hikvisionConfigs);
 
-      // Intelbras
-      const intelbrasConfigs = await runGetConfig(
-        intelbras,
-        address,
-        openPorts,
-      );
-      await runSetConfig(intelbras, address, intelbrasConfigs);
+      const hikvisionPorts = openPorts.filter((p) => vendorMap.get(p) === "HIKVISION");
+      const intelbrasPorts = openPorts.filter((p) => vendorMap.get(p) === "INTELBRAS");
 
-      if (options.autoReboot) {
-        await runSetAutoMaintainReboot(intelbras, address, intelbrasConfigs);
+      if (hikvisionPorts.length > 0) {
+        const hikvisionConfigs = await runGetConfig(hikvision, address, hikvisionPorts);
+        await runSetConfig(hikvision, address, hikvisionConfigs);
+      }
+
+      if (intelbrasPorts.length > 0) {
+        const intelbrasConfigs = await runGetConfig(intelbras, address, intelbrasPorts);
+        await runSetConfig(intelbras, address, intelbrasConfigs);
+
+        if (options.autoReboot) {
+          await runSetAutoMaintainReboot(intelbras, address, intelbrasConfigs);
+        }
       }
     }
   } catch (error: unknown) {
