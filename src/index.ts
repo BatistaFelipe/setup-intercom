@@ -2,13 +2,20 @@ import path from "node:path";
 import runScanList from "./services/scan-ports.js";
 import hikvision from "./services/hikvision.js";
 import intelbras from "./services/intelbras.js";
-import { readHostsFile, UnknownError, log } from "./utils.js";
+import {
+  readHostsFile,
+  UnknownError,
+  log,
+  validateHost,
+  validatePortRange,
+} from "./utils.js";
 import {
   runGetConfig,
   runSetConfig,
   runSetAutoMaintainReboot,
 } from "./orchestrator.js";
 import { Command } from "commander";
+import { FileData } from "./types.js";
 
 const program = new Command();
 
@@ -25,10 +32,26 @@ const options = program.opts();
   ];
   if (options.readFile) {
     const dataFile = await readHostsFile(path.resolve("data", "hosts.json"));
-    hosts = JSON.parse(dataFile.message).hosts;
+    if (!dataFile.success) {
+      log.error(`Failed to read hosts file: ${dataFile.message}`);
+      process.exit(1);
+    }
+    const parsed: FileData = JSON.parse(dataFile.message);
+    if (!Array.isArray(parsed.hosts)) {
+      log.error("Invalid hosts file: missing 'hosts' array");
+      process.exit(1);
+    }
+    hosts = parsed.hosts.map((h) => (typeof h === "string" ? h : h.host));
   }
+
+  for (const host of hosts) {
+    validateHost(host);
+  }
+
   const startPort: number = Number(process.env.START_PORT || 8084);
   const endPort: number = Number(process.env.END_PORT || 8099);
+  validatePortRange(startPort, endPort);
+
   const scanPortsFile: string = path.resolve("data", "scan-ports.json");
   const datafileIntelbras: string = path.resolve("data", "intelbras.json");
   const datafileHikvision: string = path.resolve("data", "hikvision.json");

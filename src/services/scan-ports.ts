@@ -1,11 +1,9 @@
 import net from "net";
 import { DefaultResponse } from "../types.js";
-import { log, promisesLimit, UnknownError } from "../utils.js";
-import { saveToFile } from "../utils.js";
+import { log, promisesLimit, saveToFile } from "../utils.js";
 
 const pLimit = promisesLimit();
 
-// testa se a porta do host está aberta
 const scanPort = (
   host: string,
   port: number,
@@ -14,35 +12,31 @@ const scanPort = (
   return new Promise((resolve) => {
     const socket = new net.Socket();
     socket.setTimeout(socket_timeout);
-    try {
-      socket.connect(port, host, () => {
-        socket.removeAllListeners();
-        socket.destroy();
-        resolve({ message: `${host}:${port}`, success: true });
-      });
 
-      socket.on("error", (error: any) => {
-        socket.removeAllListeners();
-        socket.destroy();
-        resolve({
-          message: `${host}:${port} Erro: ${error.message}`,
-          success: false,
-        });
-      });
+    socket.connect(port, host, () => {
+      socket.removeAllListeners();
+      socket.destroy();
+      resolve({ message: `${host}:${port}`, success: true });
+    });
 
-      socket.on("timeout", () => {
-        socket.removeAllListeners();
-        socket.destroy();
-        resolve({ message: `${host}:${port} Timeout`, success: false });
+    socket.on("error", (error: Error) => {
+      socket.removeAllListeners();
+      socket.destroy();
+      resolve({
+        message: `${host}:${port} Error: ${error.message}`,
+        success: false,
       });
-    } catch (error: unknown) {
-      const customError = new UnknownError(error);
-      return customError.toJSON();
-    }
+    });
+
+    socket.on("timeout", () => {
+      socket.removeAllListeners();
+      socket.destroy();
+      resolve({ message: `${host}:${port} Timeout`, success: false });
+    });
   });
 };
 
-// testa uma lista de portas de um host e retorna uma lista com os liberados
+// Scans a port range on a host and returns open ports
 const scanPortList = async (
   host: string,
   startPort: number,
@@ -70,7 +64,6 @@ async function runScanList(
   startPort: number,
   endPort: number,
 ) {
-  // faz o scan de portas e salva no arquivo json somente os liberados
   const scanList: DefaultResponse = await scanPortList(
     host,
     startPort,
@@ -79,11 +72,11 @@ async function runScanList(
   const statusSave = await saveToFile(scanPortsFile, scanList.message);
   if (!statusSave.success) {
     log.error(
-      `❌ ${scanPortsFile} ${host}: Erro ao salvar arquivo!\n${statusSave.message}`,
+      `SCAN_PORTS ${scanPortsFile} ${host}: Failed to save file - ${statusSave.message}`,
     );
     return;
   }
-  log.info(`✅ ${scanPortsFile} ${host}: Arquivo salvo com sucesso!`);
+  log.info(`SCAN_PORTS ${scanPortsFile} ${host}: File saved successfully`);
 }
 
 export default runScanList;
