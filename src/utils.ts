@@ -1,5 +1,6 @@
 import fs from "fs/promises";
 import { readFile } from "fs/promises";
+import path from "node:path";
 import winston, { Logger } from "winston";
 import pLimit from "p-limit";
 import { DefaultResponse } from "./types.js";
@@ -74,6 +75,8 @@ export function validateHost(address: string): void {
   }
 }
 
+const MAX_PORT_RANGE = 1000;
+
 export function validatePortRange(startPort: number, endPort: number): void {
   if (!Number.isInteger(startPort) || startPort < 1 || startPort > 65535) {
     throw new Error(`START_PORT must be an integer between 1 and 65535, got: ${startPort}`);
@@ -84,6 +87,32 @@ export function validatePortRange(startPort: number, endPort: number): void {
   if (startPort > endPort) {
     throw new Error(`START_PORT (${startPort}) must be <= END_PORT (${endPort})`);
   }
+  const range = endPort - startPort + 1;
+  if (range > MAX_PORT_RANGE) {
+    throw new Error(`Port range too large (${range} ports). Maximum allowed: ${MAX_PORT_RANGE}`);
+  }
+}
+
+const SENSITIVE_PATTERNS = [
+  /password["\s:>=]+[^\s<"&]+/gi,
+  /<password>[^<]*<\/password>/gi,
+  /digestAuth["\s:>=]+[^\s<"&]+/gi,
+];
+
+export function sanitizeLogMessage(message: string): string {
+  let sanitized = message;
+  for (const pattern of SENSITIVE_PATTERNS) {
+    sanitized = sanitized.replace(pattern, "[REDACTED]");
+  }
+  return sanitized;
+}
+
+export function getDeviceProtocol(): "http" | "https" {
+  const protocol = process.env.DEVICE_PROTOCOL?.toLowerCase();
+  if (protocol && protocol !== "http" && protocol !== "https") {
+    throw new Error(`DEVICE_PROTOCOL must be "http" or "https", got: ${protocol}`);
+  }
+  return (protocol as "http" | "https") || "http";
 }
 
 export const saveToFile = async (filename: string, data: string) => {
@@ -100,7 +129,16 @@ export async function readHostsFile(
   filename: string,
 ): Promise<DefaultResponse> {
   try {
-    const fileData: string = await readFile(filename, "utf-8");
+    const resolved = path.resolve(filename);
+    const projectRoot = path.resolve(".");
+    if (!resolved.startsWith(projectRoot + path.sep)) {
+      return {
+        message: "File path must be within the project directory",
+        success: false,
+      };
+    }
+
+    const fileData: string = await readFile(resolved, "utf-8");
 
     return {
       message: fileData,
